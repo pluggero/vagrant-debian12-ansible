@@ -6,8 +6,8 @@
 
 locals {
   debian_iso_name_x86_64 = "debian-${var.vm_guest_os_version}-amd64-netinst.iso"
-  debian_iso_url_x86_64 = "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/${local.debian_iso_name_x86_64}"
-  debian_iso_checksum_x86_64 = "file:https://cdimage.debian.org/debian-cd/${var.vm_guest_os_version}/amd64/iso-cd/SHA512SUMS"
+  debian_iso_url_x86_64 = "https://cdimage.debian.org/cdimage/archive/${var.vm_guest_os_version}/amd64/iso-cd/${local.debian_iso_name_x86_64}"
+  debian_iso_checksum_x86_64 = "file:https://cdimage.debian.org/cdimage/archive/${var.vm_guest_os_version}/amd64/iso-cd/SHA512SUMS"
 }
 
 local "http_directory" {
