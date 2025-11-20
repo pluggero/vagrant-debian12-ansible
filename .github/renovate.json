@@ -32,7 +32,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/^ansible/playbooks/main\\.yml$/",
+        "/^ansible/vars/virtualbox_guest\\.yml$/",
         "/^.github/workflows/build\\.yml$/"
       ],
       "matchStrings": [

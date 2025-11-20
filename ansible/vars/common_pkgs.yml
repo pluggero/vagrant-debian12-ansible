@@ -1,0 +1,22 @@
+---
+common_pkgs:
+  apt:
+    install:
+      - ansible
+    remove:
+      - ppp
+      - pppconfig
+      - pppoeconf
+      - cpp
+      - gcc
+      - g++
+      - libx11-data
+      - xauth
+      - libxmuu1
+      - libxcb1
+      - libx11-6
+      - libxext6
+      - linux-source
+    remove_regex:
+      - "-dev$"
+    remove_modified_configs: true

@@ -2,6 +2,18 @@
 
 [![Build](https://github.com/pluggero/packer-debian12-ansible/actions/workflows/build.yml/badge.svg)](https://github.com/pluggero/packer-debian12-ansible/actions/workflows/build.yml)
 
+## ⚠️ Security Warning
+
+**This box is intended for testing and development purposes only. DO NOT use in production environments.**
+
+This Vagrant box contains:
+
+- Publicly known insecure SSH keys (Vagrant default keys)
+- Public passwords visible in the repository
+- Pre-configured users with known credentials
+
+These are intentionally included for transparent testing but make this box completely insecure for production use.
+
 ## Supported Hypervisor Platforms
 
 - VirtualBox
