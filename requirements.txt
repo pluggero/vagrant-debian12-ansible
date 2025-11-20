@@ -1,1 +1,3 @@
-ansible
+yamllint==1.37.1
+ansible==13.0.0
+passlib==1.7.4
