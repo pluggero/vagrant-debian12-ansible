@@ -33,14 +33,26 @@
       "customType": "regex",
       "managerFilePatterns": [
         "/^ansible/vars/virtualbox_guest\\.yml$/",
-        "/^.github/workflows/build\\.yml$/"
+        "/^.github/workflows/.+\\.ya?ml$/"
       ],
       "matchStrings": [
         "virtualbox_guest_virtualbox_version:\\s+\"(?<currentValue>[\\d\\.]+)\"",
+        "VBOX_GUEST_VERSION:\\s+\"(?<currentValue>[\\d\\.]+)\""
+      ],
+      "datasourceTemplate": "custom.virtualbox",
+      "depNameTemplate": "virtualbox-role",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
         "VBOX_VERSION:\\s+\"(?<currentValue>[\\d\\.]+)\""
       ],
       "datasourceTemplate": "custom.virtualbox",
-      "depNameTemplate": "virtualbox",
+      "depNameTemplate": "virtualbox-ci",
       "versioningTemplate": "semver"
     },
     {
