@@ -9,6 +9,7 @@
     - ../vars/virtualbox_guest.yml
 
   roles:
+    - pluggero.upgrade
     - pluggero.virtualbox_guest
     - pluggero.common_pkgs
     - pluggero.user_setup
