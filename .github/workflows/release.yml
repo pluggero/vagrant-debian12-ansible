@@ -15,6 +15,7 @@ env:
   PROVIDER: virtualbox
   ARCHITECTURE: amd64
   VBOX_VERSION: "7.1.12"
+  VBOX_GUEST_VERSION: "7.2.4"
 
 jobs:
   lint:
@@ -141,6 +142,7 @@ jobs:
 
           Build Information
           - VirtualBox version: ${VBOX_VERSION}
+          - VirtualBox Guest Additions version: ${VBOX_GUEST_VERSION}
           - Git commit: ${{ steps.build_metadata.outputs.commit_sha }}
           - Build workflow: ${{ steps.build_metadata.outputs.workflow_url }}
 
@@ -186,6 +188,7 @@ jobs:
               echo "- Workflow run: ${{ steps.build_metadata.outputs.workflow_url }}"
               echo "- Build date: $(date --utc +"%Y-%m-%d %H:%M:%S UTC")"
               echo "- VirtualBox version: $VBOX_VERSION"
+              echo "- VirtualBox Guest Additions version: $VBOX_GUEST_VERSION"
               echo ""
               echo "Repository: ${{ github.server_url }}/${{ github.repository }}"
             } > ./box/checksums.txt
