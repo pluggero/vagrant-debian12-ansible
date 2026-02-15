@@ -2,7 +2,7 @@
   "extends": [
     "config:best-practices",
     ":disableRateLimiting",
-    "github>rplugge/renovate-config-ansible-galaxy"
+    "github>pluggero/renovate-config-ansible-galaxy"
   ],
   "automerge": false,
   "automergeType": "pr",
