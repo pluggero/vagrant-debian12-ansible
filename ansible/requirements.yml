@@ -1,4 +1,7 @@
 ---
+collections:
+  - name: ansible.posix
+
 roles:
   - src: pluggero.virtualbox_guest
     version: 2.5.0

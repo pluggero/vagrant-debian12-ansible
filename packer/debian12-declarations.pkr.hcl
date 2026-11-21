@@ -7,7 +7,7 @@
 locals {
   debian_iso_name_x86_64 = "debian-${var.vm_guest_os_version}-amd64-netinst.iso"
   debian_iso_url_x86_64 = "https://cdimage.debian.org/cdimage/archive/${var.vm_guest_os_version}/amd64/iso-cd/${local.debian_iso_name_x86_64}"
-  debian_iso_checksum_x86_64 = "file:https://cdimage.debian.org/cdimage/archive/${var.vm_guest_os_version}/amd64/iso-cd/SHA512SUMS"
+  debian_iso_checksum_x86_64 = "sha256:${var.vm_guest_iso_checksum_x86_64}"
 }
 
 local "http_directory" {
@@ -70,6 +70,12 @@ variable "vm_guest_os_version" {
   description = "Version of guest os to install"
   type = string
   default = ""
+}
+
+variable "vm_guest_iso_checksum_x86_64" {
+  description = "Checksum of the iso installer"
+  type        = string
+  default     = ""
 }
 
 variable "vm_boot_wait" {
