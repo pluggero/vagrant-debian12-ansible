@@ -5,6 +5,7 @@
 # Virtual Machine Settings
 vm_name                             = "debian12"
 vm_guest_os_version                 = "12.11.0"
+vm_guest_iso_checksum_x86_64        = "30ca12a15cae6a1033e03ad59eb7f66a6d5a258dcf27acd115c2bd42d22640e8"
 vm_boot_wait                        = "10s"
 vm_cpu_core                         = 4
 vm_mem_size                         = 4096
