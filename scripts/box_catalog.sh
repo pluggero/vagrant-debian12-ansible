@@ -2,7 +2,7 @@
 # (metadata.json). Meant to be sourced, not executed.
 
 # fetch_catalog BOX_NAME DESCRIPTION URL
-# Prints an empty catalog skeleton on 404 instead of failing.
+# Prints an empty catalog skeleton on 404/403 (missing key, unlistable bucket).
 fetch_catalog() {
   local box_name="$1" description="$2" url="$3"
   local tmp_body
@@ -10,7 +10,7 @@ fetch_catalog() {
   local code
   code=$(curl --silent --show-error --output "$tmp_body" --write-out '%{http_code}' --url "$url")
 
-  if [[ "$code" == "404" ]]; then
+  if [[ "$code" == "404" || "$code" == "403" ]]; then
     jq -n --arg name "$box_name" --arg desc "$description" '{name: $name, description: $desc, versions: []}'
   elif (( code >= 200 && code < 300 )); then
     cat "$tmp_body"
