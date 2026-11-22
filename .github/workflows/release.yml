@@ -79,7 +79,8 @@ jobs:
 
           echo "Authenticating to HashiCorp Cloud Platform (HCP)..."
 
-          response=$(curl --silent --location "https://auth.idp.hashicorp.com/oauth2/token" \
+          response=$(curl --silent --show-error --location "https://auth.idp.hashicorp.com/oauth2/token" \
+            --retry 2 --retry-delay 2 \
             --header "Content-Type: application/x-www-form-urlencoded" \
             --data-urlencode "client_id=${{ secrets.HCP_CLIENT_ID }}" \
             --data-urlencode "client_secret=${{ secrets.HCP_CLIENT_SECRET }}" \
@@ -89,7 +90,10 @@ jobs:
           token=$(echo "$response" | jq -r .access_token)
 
           if [[ -z "$token" || "$token" == "null" ]]; then
-            echo "Error: Failed to retrieve access token from HCP authentication response."
+            echo "::error::Failed to retrieve access token from HCP authentication response."
+            # Only surface the OAuth2 error fields, never the raw body.
+            echo "$response" | jq '{error, error_description}' 2>/dev/null \
+              || echo "(response was not valid JSON)"
             exit 1
           fi
 
@@ -102,6 +106,7 @@ jobs:
         id: prepare_box
         run: |
           set -euo pipefail
+          source scripts/hcp_registry.sh
 
           ACCESS_TOKEN="${{ steps.hcp_auth.outputs.token }}"
           BOX_NAME="${{ env.BOX_NAME }}"
@@ -114,27 +119,30 @@ jobs:
 
           echo "Checking if box '$BOX_NAME' exists..."
 
-          response=$(curl --silent --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --url "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}")
+          box_code=$(hcp_api GET "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}")
 
-          if echo "$response" | grep -q '"code":5'; then
+          if [[ "$box_code" == "404" ]]; then
             echo "Box does not exist. Creating box '$BOX_NAME'..."
-            curl --silent --fail --request POST --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --header "Content-Type: application/json" \
-              --data '{"name":"'"$BOX_NAME"'","description":"'"$REPO_URL"'","short_description":"'"$SHORT_DESCRIPTION"'","is_private":false}' \
-              "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/boxes" | jq .
+            box_payload=$(jq -n \
+              --arg name "$BOX_NAME" \
+              --arg desc "$REPO_URL" \
+              --arg short "$SHORT_DESCRIPTION" \
+              '{name: $name, description: $desc, short_description: $short, is_private: false}')
+            create_box_code=$(hcp_api POST "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/boxes" "$box_payload")
+            require_success "$create_box_code" "Create box"
+            jq . "$HCP_TMP_BODY"
             echo "Box created."
           else
+            require_success "$box_code" "Check box existence"
             echo "Box already exists."
           fi
 
           echo
           echo "Checking if version '$VERSION' exists for box '$BOX_NAME'..."
 
-          version_response=$(curl --silent \
-              --url "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architecture/${ARCHITECTURE}/download")
+          version_code=$(hcp_api GET "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architecture/${ARCHITECTURE}/download")
 
-          if echo "$version_response" | grep -q '"code":5'; then
+          if [[ "$version_code" == "404" ]]; then
             echo "Version does not exist. Creating version '$VERSION'..."
 
             # Construct description with build metadata
@@ -148,28 +156,25 @@ jobs:
 
           To verify provenance: https://github.com/${{ github.repository }}#verifying-box-provenance"
 
-            curl --silent --fail --request POST --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --header "Content-Type: application/json" \
-              --data "$(jq -n \
-                --arg name "$VERSION" \
-                --arg desc "$DESCRIPTION" \
-                --arg provider "$PROVIDER" \
-                '{name: $name, description: $desc, provider_names: [$provider]}')" \
-              "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/versions" | jq .
+            version_payload=$(jq -n \
+              --arg name "$VERSION" \
+              --arg desc "$DESCRIPTION" \
+              --arg provider "$PROVIDER" \
+              '{name: $name, description: $desc, provider_names: [$provider]}')
+            create_version_code=$(hcp_api POST "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/versions" "$version_payload")
+            require_success "$create_version_code" "Create version"
+            jq . "$HCP_TMP_BODY"
             echo "Version created."
 
             echo
             echo "Creating provider '$PROVIDER'..."
-            curl --silent --fail --request POST --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --url "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/providers" \
-              --header "Content-Type: application/json" \
-              --data '{
-                "name": "'"$PROVIDER"'",
-                "summary": {
-                  "architectures_count": 1
-                },
-                "architecture_types": ["'"$ARCHITECTURE"'"]
-              }' | jq .
+            provider_payload=$(jq -n \
+              --arg provider "$PROVIDER" \
+              --arg arch "$ARCHITECTURE" \
+              '{name: $provider, summary: {architectures_count: 1}, architecture_types: [$arch]}')
+            create_provider_code=$(hcp_api POST "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/providers" "$provider_payload")
+            require_success "$create_provider_code" "Create provider"
+            jq . "$HCP_TMP_BODY"
             echo "Provider created."
 
             echo
@@ -196,24 +201,20 @@ jobs:
 
             echo
             echo "Creating architecture '$ARCHITECTURE'..."
-            curl --silent --fail --request POST --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --url "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architectures" \
-              --header "Content-Type: application/json" \
-              --data '{
-                "architecture_type": "'"$ARCHITECTURE"'",
-                "default": true,
-                "box_data": {
-                  "checksum": "'"$checksum"'",
-                  "checksum_type": "SHA256",
-                  "size": "'$(stat --format="%s" ./box/debian12-virtualbox.box)'",
-                  "created_at": "'"$(date --utc +"%Y-%m-%dT%H:%M:%SZ")"'",
-                  "updated_at": "'"$(date --utc +"%Y-%m-%dT%H:%M:%SZ")"'"
-                }
-              }' | jq .
+            architecture_payload=$(jq -n \
+              --arg arch "$ARCHITECTURE" \
+              --arg checksum "$checksum" \
+              --arg size "$(stat --format="%s" ./box/debian12-virtualbox.box)" \
+              --arg created_at "$(date --utc +"%Y-%m-%dT%H:%M:%SZ")" \
+              '{architecture_type: $arch, default: true, box_data: {checksum: $checksum, checksum_type: "SHA256", size: $size, created_at: $created_at, updated_at: $created_at}}')
+            create_arch_code=$(hcp_api POST "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architectures" "$architecture_payload")
+            require_success "$create_arch_code" "Create architecture"
+            jq . "$HCP_TMP_BODY"
             echo "Architecture created."
 
             echo "skip_upload=false" >> $GITHUB_OUTPUT
           else
+            require_success "$version_code" "Check version existence"
             echo "Version already exists."
             echo "skip_upload=true" >> $GITHUB_OUTPUT
           fi
@@ -235,6 +236,7 @@ jobs:
         if: steps.prepare_box.outputs.skip_upload == 'false'
         run: |
           set -euo pipefail
+          source scripts/hcp_registry.sh
 
           ACCESS_TOKEN="${{ steps.hcp_auth.outputs.token }}"
           BOX_NAME="${{ env.BOX_NAME }}"
@@ -246,13 +248,15 @@ jobs:
 
           echo
           echo "Fetching upload URL..."
-          response=$(curl --silent --header "Authorization: Bearer $ACCESS_TOKEN" \
-            "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architecture/${ARCHITECTURE}/upload")
+          fetch_url_code=$(hcp_api GET "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/provider/${PROVIDER}/architecture/${ARCHITECTURE}/upload")
+          require_success "$fetch_url_code" "Fetch upload URL"
 
-          upload_url=$(echo "$response" | jq -r .url)
+          upload_url=$(jq -r .url "$HCP_TMP_BODY")
 
           if [[ -z "$upload_url" || "$upload_url" == "null" ]]; then
-            echo "Error: Failed to retrieve upload URL."
+            echo "::error::Failed to retrieve upload URL."
+            # .url is a presigned credential; only log keys, not values.
+            jq 'keys' "$HCP_TMP_BODY" 2>/dev/null || echo "(response was not valid JSON)"
             exit 1
           fi
 
@@ -260,14 +264,14 @@ jobs:
 
           echo
           echo "Uploading box file..."
-          curl --fail --request PUT --upload-file ./box/debian12-virtualbox.box "$upload_url"
+          curl --show-error --fail-with-body --retry 2 --retry-delay 2 \
+            --request PUT --upload-file ./box/debian12-virtualbox.box "$upload_url"
           echo "Box upload completed."
 
           echo
           echo "Finalizing release..."
-          curl --silent --fail --request PUT \
-            --header "Authorization: Bearer $ACCESS_TOKEN" \
-            "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/release"
+          finalize_code=$(hcp_api PUT "https://api.cloud.hashicorp.com/vagrant/2022-09-30/registry/${REGISTRY}/box/${BOX_NAME}/version/${VERSION}/release")
+          require_success "$finalize_code" "Finalize release"
 
           echo
           echo "Box version released successfully!"
